@@ -11,16 +11,14 @@
 set -e  # fail on error
 
 function print_help {
-   echo "$(basename $0) [--help|-h] [--quiet|-q] [--keep] [--name|-n] [--pkg|-p] [--iktype|-t] <input> <group> <base> <eef>"
+   echo "$(basename $0) [--help|-h] [--quiet|-q] [--keep] [--name|-n] [--iktype|-t] [--freejoint|-t] <input> <base> <eef>"
    echo "  input          .urdf, .dae, or .cpp input file"
    echo "                 File type determines required processing stages."
-   echo "  group          planning group"
    echo "  base           name of base link"
    echo "  eef            name of end-effector link"
    echo "--quiet          suppress output of OpenRave"
    echo "--keep           keep intermediate results, i.e. don't delete temporary folder on exit"
-   echo "--name <robot>   Robot name, default extracted from urdf"
-   echo "--pkg  <name>    Package name, default: <robot>_<planning group>_ikfast_plugin"
+   echo "--name <robot>   Robot name in urdf"
    echo "--iktype <type>  OpenRave kinematics type [must be one of Direction3D, Transform6D, Rotation3D, TranslationDirection5D, TranslationAxisAngle4D, Ray4D, TranslationXYOrientation3D, TranslationXY2D, Translation3D,  Rotation3D, LookAt3D, Direction3D, or Direction3D default: Transform6D]"
    echo "--freejoint <joint_name> Free joint name"
 }
@@ -51,9 +49,6 @@ function parse_options {
          --name|-n)
             ROBOT_NAME=$2; shift
             ;;
-         --pkg|-p)
-            PKG_NAME=$2; shift
-            ;;
          -*)
             echo "Unknown option: $1"
             print_help
@@ -74,13 +69,11 @@ function parse_options {
 }
 
 function set_option_defaults {
-   # ROBOT_NAME is auto-extracted from URDF or otherwise needs to be specified as an option
    if [ -z "$ROBOT_NAME" ] ; then
       echo "Undefined robot name. Please specify option --name".
       exit 1
    fi
-   # Define default PKG_NAME if not yet defined
-   PKG_NAME=${PKG_NAME:-${ROBOT_NAME}_generated}
+   PKG_NAME=${ROBOT_NAME}_generated
 }
 
 function cleanup {
