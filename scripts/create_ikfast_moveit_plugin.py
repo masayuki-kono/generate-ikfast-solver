@@ -47,29 +47,8 @@ POSSIBILITY OF SUCH DAMAGE.
 
 import re
 import os
-import yaml
-from lxml import etree
-from getpass import getuser
 import shutil
 import argparse
-
-try:
-    from roslib.packages import get_pkg_dir, InvalidROSPkgException
-except ImportError:
-    print("Failed to import roslib. No ROS environment available? Trying without.")
-
-    # define stubs
-    class InvalidROSPkgException(Exception):
-        pass
-
-    def get_pkg_dir(pkg_name):
-        raise InvalidROSPkgException(f"Failed to locate ROS package {pkg_name}")
-
-
-# Package containing this file
-plugin_gen_pkg = "moveit_kinematics"
-# Allowed search modes, see SEARCH_MODE enum in template file
-search_modes = ["OPTIMIZE_MAX_JOINT", "OPTIMIZE_FREE_JOINT"]
 
 
 def create_parser():
@@ -77,10 +56,6 @@ def create_parser():
         description="Generate an IKFast MoveIt kinematic plugin"
     )
     parser.add_argument("robot_name", help="The name of your robot")
-    parser.add_argument(
-        "planning_group_name",
-        help="The name of the planning group for which your IKFast solution was generated",
-    )
     parser.add_argument(
         "ikfast_plugin_pkg",
         help="The name of the MoveIt IKFast Kinematics Plugin to be created/updated",
@@ -98,22 +73,6 @@ def create_parser():
         help="The full path to the analytic IK solution output by IKFast",
     )
     parser.add_argument(
-        "--search_mode",
-        default=search_modes[0],
-        help="The search mode used to solve IK for robots with more than 6DOF",
-    )
-    parser.add_argument(
-        "--srdf_filename", help="The name of your robot. Defaults to <robot_name>.srdf"
-    )
-    parser.add_argument(
-        "--robot_name_in_srdf",
-        help="The name of your robot as defined in the srdf. Defaults to <robot_name>",
-    )
-    parser.add_argument(
-        "--moveit_config_pkg",
-        help="The robot moveit_config package. Defaults to <robot_name>_moveit_config",
-    )
-    parser.add_argument(
         "--eef_direction",
         type=float,
         nargs=3,
@@ -124,38 +83,17 @@ def create_parser():
     return parser
 
 
-def populate_optional(args):
-    if args.srdf_filename is None:
-        args.srdf_filename = args.robot_name + ".srdf"
-    if args.robot_name_in_srdf is None:
-        args.robot_name_in_srdf = args.robot_name
-    if args.moveit_config_pkg is None:
-        args.moveit_config_pkg = args.robot_name + "_moveit_config"
-
-
 def print_args(args):
     print("Creating IKFastKinematicsPlugin with parameters: ")
     print(f" robot_name:           {args.robot_name}")
     print(f" base_link_name:       {args.base_link_name}")
     print(f" eef_link_name:        {args.eef_link_name}")
-    print(f" planning_group_name:  {args.planning_group_name}")
     print(f" ikfast_plugin_pkg:    {args.ikfast_plugin_pkg}")
     print(f" ikfast_output_path:   {args.ikfast_output_path}")
-    print(f" search_mode:          {args.search_mode}")
-    print(f" srdf_filename:        {args.srdf_filename}")
-    print(f" robot_name_in_srdf:   {args.robot_name_in_srdf}")
-    print(f" moveit_config_pkg:    {args.moveit_config_pkg}")
     print(
         f" eef_direction:        {args.eef_direction[0]:g} {args.eef_direction[1]:g} {args.eef_direction[2]:g}"
     )
     print("")
-
-
-def update_deps(reqd_deps, req_type, e_parent):
-    curr_deps = [e.text for e in e_parent.findall(req_type)]
-    missing_deps = set(reqd_deps) - set(curr_deps)
-    for dep in missing_deps:
-        etree.SubElement(e_parent, req_type).text = dep
 
 
 def validate_openrave_version(args):
@@ -180,22 +118,13 @@ def validate_openrave_version(args):
         raise Exception("This converter requires IKFast 0.5.6 or newer.")
 
 
-def xmlElement(name, text=None, **attributes):
-    e = etree.Element(name, **attributes)
-    e.text = text
-    return e
-
-
 def create_ikfast_package(args):
-    try:
-        setattr(args, "ikfast_plugin_pkg_path", get_pkg_dir(args.ikfast_plugin_pkg))
-    except InvalidROSPkgException:
-        args.ikfast_plugin_pkg_path = os.path.abspath(args.ikfast_plugin_pkg)
-        print(
-            f"Createing new package {args.ikfast_plugin_pkg} it in {args.ikfast_plugin_pkg_path}."
-        )
-        # update pkg name to basename of path
-        args.ikfast_plugin_pkg = os.path.basename(args.ikfast_plugin_pkg_path)
+    args.ikfast_plugin_pkg_path = os.path.abspath(args.ikfast_plugin_pkg)
+    print(
+        f"Createing new package {args.ikfast_plugin_pkg} it in {args.ikfast_plugin_pkg_path}."
+    )
+    # update pkg name to basename of path
+    args.ikfast_plugin_pkg = os.path.basename(args.ikfast_plugin_pkg_path)
 
     src_path = args.ikfast_plugin_pkg_path + "/src/"
     if not os.path.exists(src_path):
@@ -210,12 +139,6 @@ def find_template_dir():
     for candidate in [os.path.dirname(__file__) + "/../templates"]:
         if os.path.exists(candidate) and os.path.exists(candidate + "/ikfast.h"):
             return os.path.realpath(candidate)
-    try:
-        return os.path.join(
-            get_pkg_dir(plugin_gen_pkg), "ikfast_kinematics_plugin/templates"
-        )
-    except InvalidROSPkgException:
-        raise Exception(f"Can't find package {plugin_gen_pkg}")
 
 
 def update_ikfast_package(args):
@@ -237,19 +160,6 @@ def update_ikfast_package(args):
 
     # Get template folder location
     template_dir = find_template_dir()
-
-    # namespace for the plugin
-    setattr(args, "namespace", args.robot_name + "_" + args.planning_group_name)
-    replacements = dict(
-        _ROBOT_NAME_=args.robot_name,
-        _GROUP_NAME_=args.planning_group_name,
-        _SEARCH_MODE_=args.search_mode,
-        _EEF_LINK_=args.eef_link_name,
-        _BASE_LINK_=args.base_link_name,
-        _PACKAGE_NAME_=args.ikfast_plugin_pkg,
-        _NAMESPACE_=args.namespace,
-        _EEF_DIRECTION_=f"{args.eef_direction[0]:g}, {args.eef_direction[1]:g}, {args.eef_direction[2]:g}",
-    )
 
     # Copy ikfast header file
     copy_file(
@@ -288,7 +198,6 @@ def main():
     parser = create_parser()
     args = parser.parse_args()
 
-    populate_optional(args)
     print_args(args)
     validate_openrave_version(args)
     create_ikfast_package(args)
