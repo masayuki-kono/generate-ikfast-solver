@@ -504,16 +504,16 @@ def main():
     validate_openrave_version(args)
     create_ikfast_package(args)
     update_ikfast_package(args)
-    try:
-        update_moveit_package(args)
-    except Exception as ex:
-        print(
-            f"""Failed to update MoveIt package:
-{ex}
-Update your kinematics.yaml manually to include the following configuration:
-{args.planning_group_name}:
-  kinematics_solver: {args.plugin_name}"""
-        )
+#     try:
+#         update_moveit_package(args)
+#     except Exception as ex:
+#         print(
+#             f"""Failed to update MoveIt package:
+# {ex}
+# Update your kinematics.yaml manually to include the following configuration:
+# {args.planning_group_name}:
+#   kinematics_solver: {args.plugin_name}"""
+#         )
 
 
 if __name__ == "__main__":
