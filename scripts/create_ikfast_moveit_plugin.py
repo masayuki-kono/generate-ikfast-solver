@@ -204,26 +204,6 @@ def create_ikfast_package(args):
     if not os.path.exists(include_path):
         os.makedirs(include_path)
 
-    # Create package.xml
-    pkg_xml_path = args.ikfast_plugin_pkg_path + "/package.xml"
-    if not os.path.exists(pkg_xml_path):
-        root = xmlElement("package", format="2")
-        root.append(xmlElement("name", text=args.ikfast_plugin_pkg))
-        root.append(xmlElement("version", text="0.0.0"))
-        root.append(
-            xmlElement("description", text="IKFast plugin for " + args.robot_name)
-        )
-        root.append(xmlElement("license", text="BSD"))
-        user_name = getuser()
-        root.append(
-            xmlElement("maintainer", email=f"{user_name}@todo.todo", text=user_name)
-        )
-        root.append(xmlElement("buildtool_depend", text="catkin"))
-        etree.ElementTree(root).write(
-            pkg_xml_path, xml_declaration=True, pretty_print=True, encoding="UTF-8"
-        )
-        print(f"Created package.xml at: '{pkg_xml_path}'")
-
 
 def find_template_dir():
     for candidate in [os.path.dirname(__file__) + "/../templates"]:
@@ -243,8 +223,6 @@ def update_ikfast_package(args):
     solver_file_path = (
         src_path
         + args.robot_name
-        + "_"
-        + args.planning_group_name
         + "_ikfast_solver.cpp"
     )
     if not os.path.exists(solver_file_path) or not os.path.samefile(
@@ -282,198 +260,6 @@ def update_ikfast_package(args):
         args.ikfast_plugin_pkg_path + "/include/ikfast.h",
         "ikfast header file",
     )
-    # Create ikfast plugin template
-    copy_file(
-        template_dir
-        + "/ikfast"
-        + str(args.template_version)
-        + "_moveit_plugin_template.cpp",
-        args.ikfast_plugin_pkg_path
-        + "/src/"
-        + args.robot_name
-        + "_"
-        + args.planning_group_name
-        + "_ikfast_moveit_plugin.cpp",
-        "ikfast plugin file",
-        replacements,
-    )
-
-    # Create plugin definition .xml file
-    ik_library_name = args.namespace + "_moveit_ikfast_plugin"
-    plugin_def = etree.Element("library", path="lib/lib" + ik_library_name)
-    setattr(args, "plugin_name", args.namespace + "/IKFastKinematicsPlugin")
-    cl = etree.SubElement(
-        plugin_def,
-        "class",
-        name=args.plugin_name,
-        type=args.namespace + "::IKFastKinematicsPlugin",
-        base_class_type="kinematics::KinematicsBase",
-    )
-    desc = etree.SubElement(cl, "description")
-    desc.text = f"IKFast{args.template_version} plugin for closed-form kinematics of {args.robot_name} {args.planning_group_name}"
-
-    # Write plugin definition to file
-    plugin_file_name = ik_library_name + "_description.xml"
-    plugin_file_path = args.ikfast_plugin_pkg_path + "/" + plugin_file_name
-    etree.ElementTree(plugin_def).write(
-        plugin_file_path, xml_declaration=True, pretty_print=True, encoding="UTF-8"
-    )
-    print(f"Created plugin definition at  '{plugin_file_path}'")
-
-    # Create CMakeLists file
-    replacements.update(dict(_LIBRARY_NAME_=ik_library_name))
-    copy_file(
-        template_dir + "/CMakeLists.txt",
-        args.ikfast_plugin_pkg_path + "/CMakeLists.txt",
-        "cmake file",
-        replacements,
-    )
-
-    # Add plugin export to package manifest
-    parser = etree.XMLParser(remove_blank_text=True)
-    package_file_name = args.ikfast_plugin_pkg_path + "/package.xml"
-    package_xml = etree.parse(package_file_name, parser).getroot()
-
-    # Make sure at least all required dependencies are in the depends lists
-    build_deps = [
-        "liblapack-dev",
-        "moveit_core",
-        "pluginlib",
-        "roscpp",
-        "tf2_kdl",
-        "tf2_eigen",
-    ]
-    run_deps = ["liblapack-dev", "moveit_core", "pluginlib", "roscpp"]
-
-    update_deps(build_deps, "build_depend", package_xml)
-    update_deps(run_deps, "exec_depend", package_xml)
-
-    # Check that plugin definition file is in the export list
-    new_export = etree.Element("moveit_core", plugin="${prefix}/" + plugin_file_name)
-
-    export_element = package_xml.find("export")
-    if export_element is None:
-        export_element = etree.SubElement(package_xml, "export")
-
-    found = False
-    for el in export_element.findall("moveit_core"):
-        found = etree.tostring(new_export) == etree.tostring(el)
-        if found:
-            break
-
-    if not found:
-        export_element.append(new_export)
-
-    # Always write the package xml file, even if there are no changes, to ensure
-    # proper encodings are used in the future (UTF-8)
-    etree.ElementTree(package_xml).write(
-        package_file_name, xml_declaration=True, pretty_print=True, encoding="UTF-8"
-    )
-    print(f"Wrote package.xml at  '{package_file_name}'")
-
-    # Create a script for easily updating the plugin in the future in case the plugin needs to be updated
-    easy_script_file_path = args.ikfast_plugin_pkg_path + "/update_ikfast_plugin.sh"
-    with open(easy_script_file_path, "w") as f:
-        f.write(
-            "search_mode="
-            + args.search_mode
-            + "\n"
-            + "srdf_filename="
-            + args.srdf_filename
-            + "\n"
-            + "robot_name_in_srdf="
-            + args.robot_name_in_srdf
-            + "\n"
-            + "moveit_config_pkg="
-            + args.moveit_config_pkg
-            + "\n"
-            + "robot_name="
-            + args.robot_name
-            + "\n"
-            + "planning_group_name="
-            + args.planning_group_name
-            + "\n"
-            + "ikfast_plugin_pkg="
-            + args.ikfast_plugin_pkg
-            + "\n"
-            + "base_link_name="
-            + args.base_link_name
-            + "\n"
-            + "eef_link_name="
-            + args.eef_link_name
-            + "\n"
-            + "ikfast_output_path="
-            + args.ikfast_output_path
-            + "\n"
-            + "eef_direction="
-            + f'"{args.eef_direction[0]:g} {args.eef_direction[1]:g} {args.eef_direction[2]:g}"'
-            + "\n\n"
-            + "rosrun moveit_kinematics create_ikfast_moveit_plugin.py\\\n"
-            + "  --search_mode=$search_mode\\\n"
-            + "  --srdf_filename=$srdf_filename\\\n"
-            + "  --robot_name_in_srdf=$robot_name_in_srdf\\\n"
-            + "  --moveit_config_pkg=$moveit_config_pkg\\\n"
-            + "  --eef_direction $eef_direction\\\n"
-            + "  $robot_name\\\n"
-            + "  $planning_group_name\\\n"
-            + "  $ikfast_plugin_pkg\\\n"
-            + "  $base_link_name\\\n"
-            + "  $eef_link_name\\\n"
-            + "  $ikfast_output_path\n"
-        )
-
-    print(f"Created update plugin script at '{easy_script_file_path}'")
-
-
-def update_moveit_package(args):
-    try:
-        moveit_config_pkg_path = get_pkg_dir(args.moveit_config_pkg)
-    except InvalidROSPkgException:
-        raise RuntimeError(f"Failed to find package: {args.moveit_config_pkg}")
-
-    # SRDF sanity checks
-    try:
-        srdf_file_name = moveit_config_pkg_path + "/config/" + args.srdf_filename
-        srdf = etree.parse(srdf_file_name).getroot()
-
-        robot_name = srdf.get("name")
-        if args.robot_name_in_srdf != robot_name:
-            raise RuntimeWarning(
-                f"Robot name in srdf ('{robot_name}') doesn't match expected name ('{args.robot_name_in_srdf}')"
-            )
-
-        groups = [g.get("name") for g in srdf.findall("group")]
-        if args.planning_group_name not in groups:
-            raise RuntimeWarning(
-                f"Planning group '{args.planning_group_name}' not defined in the SRDF."
-                " Available groups: \n" + ", ".join(groups)
-            )
-
-    except IOError:
-        print(f"Failed to find SRDF file: {srdf_file_name}")
-    except etree.XMLSyntaxError as err:
-        print(f"Failed to parse xml in file: {srdf_file_name}\n{err.msg}")
-
-    # Modify kinematics.yaml file
-    kin_yaml_file_name = moveit_config_pkg_path + "/config/kinematics.yaml"
-    with open(kin_yaml_file_name, "r") as f:
-        kin_yaml_data = yaml.safe_load(f)
-
-    try:
-        kin_yaml_data[args.planning_group_name]["kinematics_solver"] = args.plugin_name
-    except KeyError:
-        # create new group entry
-        print(
-            f"Creating new planning group entry in kinematics.yaml for '{args.planning_group_name}'"
-        )
-        kin_yaml_data[args.planning_group_name] = dict(
-            kinematics_solver=args.plugin_name
-        )
-
-    with open(kin_yaml_file_name, "w") as f:
-        yaml.dump(kin_yaml_data, f, default_flow_style=False)
-
-    print(f"Modified kinematics.yaml at '{kin_yaml_file_name}'")
 
 
 def copy_file(src_path, dest_path, description, replacements=None):
@@ -504,16 +290,6 @@ def main():
     validate_openrave_version(args)
     create_ikfast_package(args)
     update_ikfast_package(args)
-#     try:
-#         update_moveit_package(args)
-#     except Exception as ex:
-#         print(
-#             f"""Failed to update MoveIt package:
-# {ex}
-# Update your kinematics.yaml manually to include the following configuration:
-# {args.planning_group_name}:
-#   kinematics_solver: {args.plugin_name}"""
-#         )
 
 
 if __name__ == "__main__":
