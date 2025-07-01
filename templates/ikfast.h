@@ -371,6 +371,18 @@ IKFAST_API int GetIkType();
 /// \brief a hash of all the chain values used for double checking that the correct IK is used.
 IKFAST_API const char* GetKinematicsHash();
 
+typedef struct {
+    int numSolutions;
+    int numJoints;
+    IkReal* solutions;
+} IkSolutionListC;
+
+/// \brief ComputeIk function for C language interface
+IKFAST_API bool ComputeIkC(const IkReal* eetrans, const IkReal* eerot, const IkReal* pfree, IkSolutionListC* solutions);
+
+/// \brief Free memory of solution list for C language interface
+IKFAST_API void FreeIkSolutionList(IkSolutionListC* solutions);
+
 #ifdef IKFAST_NAMESPACE
 }
 #endif
