@@ -22,6 +22,7 @@ function print_help {
    echo "--name <robot>   Robot name, default extracted from urdf"
    echo "--pkg  <name>    Package name, default: <robot>_<planning group>_ikfast_plugin"
    echo "--iktype <type>  OpenRave kinematics type [must be one of Direction3D, Transform6D, Rotation3D, TranslationDirection5D, TranslationAxisAngle4D, Ray4D, TranslationXYOrientation3D, TranslationXY2D, Translation3D,  Rotation3D, LookAt3D, Direction3D, or Direction3D default: Transform6D]"
+   echo "--freejoint <joint_name> Free joint name"
 }
 
 function parse_options {
@@ -43,6 +44,9 @@ function parse_options {
             ;;
          --iktype|-t)
             IK_TYPE=$2; shift
+            ;;
+         --freejoint|-f)
+            FREE_JOINT=$2; shift
             ;;
          --name|-n)
             ROBOT_NAME=$2; shift
@@ -167,7 +171,7 @@ EOF
    build_docker_image
 
    # Assemble openrave command
-   cmd="openrave0.9.py --database inversekinematics --robot=/input/wrapper.xml --iktype=$IK_TYPE --iktests=1000"
+   cmd="openrave0.9.py --database inversekinematics --robot=/input/wrapper.xml --iktype=$IK_TYPE --freejoint=$FREE_JOINT --iktests=1000"
    echo "Running $cmd"
 
    # run $cmd in docker as current user, outputting files to $TMP_DIR/.openrave
