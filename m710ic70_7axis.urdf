@@ -73,4 +73,11 @@
     <parent link="link_6" />
     <child link="flange" />
   </joint>
+
+  <link name="tool0" />
+  <joint name="link_6-tool0" type="fixed">
+    <origin xyz="0 0 0" rpy="3.14159 -1.570795 0" />
+    <parent link="flange" />
+    <child link="tool0" />
+  </joint>
 </robot>
