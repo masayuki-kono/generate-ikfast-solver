@@ -17,7 +17,7 @@
   <link name="link_6">
   </link>
 
-  <joint name="e_1" type="prismatic">
+  <joint name="joint_e1" type="prismatic">
     <origin xyz="0 0 0" rpy="0 0 0" />
     <parent link="base_link" />
     <child link="link_e1" />
