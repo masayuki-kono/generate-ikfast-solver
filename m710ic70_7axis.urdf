@@ -43,6 +43,7 @@
     <parent link="link_2" />
     <child link="link_3" />
     <axis xyz="0 -1 0" />
+    <!-- Link angle limit (not display angles on teach pendant), see MECHANICAL UNIT OPERATOR'S MANUAL(B-82274EN/12) -->
     <limit effort="0" lower="-1.405" upper="3.5779" velocity="3.0543" />
   </joint>
   <joint name="joint_4" type="revolute">
